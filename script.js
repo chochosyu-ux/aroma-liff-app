@@ -1,82 +1,103 @@
-// 請填入你的 Notion 設定
-const NOTION_TOKEN = 'ntn_o62070106085aj5mN6o0wEzDsWlU6ptnkrY9WlIk56O9Jd';
-const OILS_DB_ID = '322171f7773080fcad5dec83586475ff';
-const LOGS_DB_ID = '322171f777308091abbbf7af4f80a75a'; // 客資資料庫 ID
-const NOTION_VERSION = '2022-06-28';
+// ⚠️ 第一步：請將這裡換成你剛剛在 GAS 重新部署後，拿到的「最新網頁應用程式網址」！
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwwPZYPgWmD1-xRoVP8FE06kjzOuiyFNYC3JEpZZPOz1aOJGo31jl-cTxMirHXYmT4igw/exec";
 
-// 1. 輸出前端網頁
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('涵香療癒所 🌿 專屬精油盲抽')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-}
+// 存放客戶的 LINE 暱稱
+let currentUserName = "匿名個案"; 
+let oilsList = []; // 存放從 Notion 抓下來的精油清單
 
-// 2. 取得精油清單 (進階療癒版)
-function getNotionOils() {
-  const url = `https://api.notion.com/v1/databases/${OILS_DB_ID}/query`;
-  const options = {
-    method: 'post',
-    headers: {
-      'Authorization': `Bearer ${NOTION_TOKEN}`,
-      'Notion-Version': NOTION_VERSION,
-      'Content-Type': 'application/json'
-    },
-    muteHttpExceptions: true
-  };
-  
-  const response = UrlFetchApp.fetch(url, options);
-  const data = JSON.parse(response.getContentText());
-  
-  if (!data || !data.results) return [];
-  
-  // 建立一個小工具來安全地抓取文字
-  const getText = (props, colName) => {
-    if (props[colName] && props[colName].rich_text && props[colName].rich_text.length > 0) {
-      return props[colName].rich_text[0].plain_text;
-    }
-    return ''; // 如果沒填寫，回傳空白
-  };
-
-  return data.results.map(page => {
-    const props = page.properties;
-    const nameData = props['name']?.title;
+// 1. 初始化 LINE LIFF
+async function initializeLiff() {
+  try {
+    // ⚠️ 記得替換成你真實的 LIFF ID
+    await liff.init({ liffId: "你的_LIFF_ID" }); 
     
-    return {
-      name: (nameData && nameData.length > 0) ? nameData[0].plain_text : '未知精油',
-      quote: getText(props, 'quote') || '「傾聽內心的聲音，給自己一點時間。」',
-      energy: getText(props, 'energy') || '精油正在與你的能量共振，請深呼吸感受它。',
-      action: getText(props, 'action') || '將注意力帶回當下，給自己一個擁抱。',
-      affirmation: getText(props, 'affirmation') || '我允許自己以最舒服的節奏前進。'
-    };
-  });
-}
-
-// 將客戶資料(LINE暱稱)寫入個案紀錄
-function saveToNotion(userName, drawnOil) {
-  const url = `https://api.notion.com/v1/pages`;
-  const payload = {
-    parent: { database_id: LOGS_DB_ID },
-    properties: {
-      // 這裡的名稱必須跟 Notion 資料庫完全一模一樣！
-      "客戶姓名 / 暱稱": { title: [{ text: { content: userName || "匿名個案" } }] },
-      "聯絡方式 (LINE/IG)": { rich_text: [{ text: { content: "LINE 官方帳號互動" } }] },
-      "客群狀態": { select: { name: "盲抽新客" } },
-      "抽中精油": { rich_text: [{ text: { content: drawnOil } }] }
+    if (liff.isLoggedIn()) {
+      const profile = await liff.getProfile();
+      currentUserName = profile.displayName; // 成功抓到 LINE 暱稱！
+      console.log("登入成功，客戶暱稱：", currentUserName);
+    } else {
+      // 如果是在外部瀏覽器打開，可以引導登入
+      // liff.login(); 
+      console.log("未登入 LINE");
     }
-  };
-  
-  const options = {
-    method: 'post',
-    headers: {
-      'Authorization': `Bearer ${NOTION_TOKEN}`,
-      'Notion-Version': NOTION_VERSION,
-      'Content-Type': 'application/json'
-    },
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-  
-  UrlFetchApp.fetch(url, options);
-  return true;
+    
+    // 初始化成功後，開始去後端抓精油資料
+    await fetchOilsData();
+
+  } catch (error) {
+    console.error("LIFF 初始化失敗:", error);
+    // 這裡是你原本寫的防呆訊息
+    // document.getElementById('greetingText').innerText = "系統連線異常，請稍後再試"; 
+  }
 }
 
+// 2. 向 GAS 請求精油清單 (取代原本的 google.script.run.getNotionOils)
+async function fetchOilsData() {
+  try {
+    console.log("正在向 GAS 獲取精油資料...");
+    
+    const response = await fetch(GAS_API_URL, {
+      method: "POST",
+      redirect: "follow", // GAS API 必須加這行處理轉址
+      body: JSON.stringify({ action: "getOils" }) // 告訴 GAS 我們要抓資料
+    });
+
+    const result = await response.json();
+    
+    if (result.status === "success") {
+      oilsList = result.data;
+      console.log("成功取得精油清單！", oilsList);
+      // 👉 這裡可以寫：隱藏載入動畫、顯示「開始盲抽」按鈕的邏輯
+      
+    } else {
+      throw new Error(result.message);
+    }
+  } catch (error) {
+    console.error("獲取資料失敗:", error);
+  }
+}
+
+// 3. 執行盲抽，並將結果存回 Notion (取代原本的 google.script.run.saveToNotion)
+async function drawOilAndSave() {
+  if (oilsList.length === 0) {
+    alert("精油資料還沒準備好，請稍等一下喔！");
+    return;
+  }
+
+  // 隨機抽出一支精油
+  const randomIndex = Math.floor(Math.random() * oilsList.length);
+  const drawnOil = oilsList[randomIndex];
+  
+  // 👉 這裡可以寫：把抽中結果 (drawnOil.name, drawnOil.quote) 顯示在畫面上的邏輯
+  console.log(`恭喜！${currentUserName} 抽中了：${drawnOil.name}`);
+
+  // 背景將紀錄傳送給 GAS 存入 Notion
+  try {
+    const response = await fetch(GAS_API_URL, {
+      method: "POST",
+      redirect: "follow",
+      body: JSON.stringify({ 
+        action: "saveRecord", 
+        userName: currentUserName, 
+        drawnOil: drawnOil.name 
+      })
+    });
+
+    const result = await response.json();
+    if (result.status === "success") {
+      console.log("🎉 個案紀錄已成功無縫寫入 Notion！");
+    } else {
+      console.error("寫入 Notion 失敗:", result.message);
+    }
+  } catch (error) {
+    console.error("傳送存檔請求失敗:", error);
+  }
+}
+
+// 網頁載入完成後，啟動 LIFF
+document.addEventListener("DOMContentLoaded", () => {
+  initializeLiff();
+  
+  // 假設你有一個 id 叫 drawButton 的按鈕
+  // document.getElementById('drawButton').addEventListener('click', drawOilAndSave);
+});
