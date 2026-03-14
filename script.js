@@ -9,7 +9,7 @@ let oilsList = []; // 存放從 Notion 抓下來的精油清單
 async function initializeLiff() {
   try {
     // ⚠️ 記得替換成你真實的 LIFF ID
-    await liff.init({ liffId: "你的_LIFF_ID" }); 
+    await liff.init({ liffId: "2009442731-uAtwWSRT" }); 
     
     if (liff.isLoggedIn()) {
       const profile = await liff.getProfile();
