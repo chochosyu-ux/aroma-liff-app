@@ -77,67 +77,29 @@
             fetchNotionOils();
         }
 
-        // 2. 呼叫 GAS 後端取得精油 (改用 fetch)
-        async function fetchNotionOils() {
-            try {
-                const response = await fetch(GAS_API_URL, {
-                    method: 'POST',
-                    redirect: 'follow', // 處理 GAS 的重新導向
-                    body: JSON.stringify({ action: "getOils" })
-                });
+        // 2. 呼叫 GAS 後端取得精油 (修改這一段)
+        const response = await fetch(GAS_API_URL, {
+            method: 'POST',
+            redirect: 'follow', 
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8" // 👈 就是加上這行「隱形斗篷」！避開 CORS！
+            },
+            body: JSON.stringify({ action: "getOils" })
+        });
 
-                const result = await response.json();
-
-                if (result.status === "success") {
-                    oils = result.data;
-                    drawBtn.innerText = "輕觸牌卡，開始盲抽";
-                    drawBtn.disabled = false;
-                } else {
-                    throw new Error(result.message);
-                }
-            } catch (error) {
-                console.error("資料連線失敗:", error);
-                drawBtn.innerText = "資料連線失敗";
-            }
-        }
-
-        // 3. 抽油與寫入客資 (改用 fetch 背景寫入)
-        async function drawOil() {
-            if (oils.length === 0) return;
-
-            const randomIndex = Math.floor(Math.random() * oils.length);
-            const selected = oils[randomIndex];
-
-            document.getElementById('inputArea').classList.add('hidden');
-            const card = document.getElementById('resultCard');
-            
-            card.style.animation = 'none';
-            card.offsetHeight; 
-            card.style.animation = 'fadeIn 0.8s ease forwards';
-
-            document.getElementById('oilName').innerText = selected.name;
-            document.getElementById('oilQuote').innerText = selected.quote;
-            document.getElementById('oilEnergy').innerText = selected.energy;
-            document.getElementById('oilAction').innerText = selected.action;
-            document.getElementById('oilAffirmation').innerText = selected.affirmation;
-            card.style.display = 'block';
-
-            // 背景自動寫入 Notion 療癒個案紀錄
-            try {
-                await fetch(GAS_API_URL, {
-                    method: 'POST',
-                    redirect: 'follow',
-                    body: JSON.stringify({ 
-                        action: "saveRecord", 
-                        userName: customerName, 
-                        drawnOil: selected.name 
-                    })
-                });
-                console.log("紀錄已存入 Notion");
-            } catch (error) {
-                console.error("存檔失敗:", error);
-            }
-        }
+        // 3. 抽油與寫入客資 (修改裡面的 fetch)
+        await fetch(GAS_API_URL, {
+            method: 'POST',
+            redirect: 'follow',
+            headers: {
+                "Content-Type": "text/plain;charset=utf-8" // 👈 一樣加上這行
+            },
+            body: JSON.stringify({ 
+                action: "saveRecord", 
+                userName: customerName, 
+                drawnOil: selected.name 
+            })
+        });
 
         // 網頁一載入就啟動 LIFF
         initLiff();
