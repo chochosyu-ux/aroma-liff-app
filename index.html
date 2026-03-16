@@ -58,7 +58,7 @@
     </div>
 
     <script>
-        // ⚠️ 這裡非常重要！請換成你 GAS 「重新部署」後取得的最新網址！
+        // 你的最新 GAS 網址 (已帶入)
         const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwwPZYPgWmD1-xRoVP8FE06kjzOuiyFNYC3JEpZZPOz1aOJGo31jl-cTxMirHXYmT4igw/exec";
 
         let oils = [];
@@ -66,42 +66,87 @@
         const drawBtn = document.getElementById('drawBtn');
         const greetingText = document.getElementById('greetingText');
 
-        // 1. 初始化 LINE LIFF (終極作弊測試版)
+        // 1. 初始化 (作弊測試版 - 電腦可開)
         async function initLiff() {
-            // 💡 略過所有 LINE 的驗證，直接寫死假資料
             console.log("進入作弊模式：跳過 LINE 驗證");
             customerName = "開發測試員"; 
             greetingText.innerText = `親愛的 ${customerName}，抽取今日的專屬療癒指引吧`;
             
-            // 直接呼叫後端拿精油資料，看看是誰在擋我們！
+            // 呼叫後端拿精油資料
             fetchNotionOils();
         }
 
-        // 2. 呼叫 GAS 後端取得精油 (修改這一段)
-        const response = await fetch(GAS_API_URL, {
-            method: 'POST',
-            redirect: 'follow', 
-            headers: {
-                "Content-Type": "text/plain;charset=utf-8" // 👈 就是加上這行「隱形斗篷」！避開 CORS！
-            },
-            body: JSON.stringify({ action: "getOils" })
-        });
+        // 2. 呼叫 GAS 後端取得精油
+        async function fetchNotionOils() {
+            try {
+                const response = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    redirect: 'follow', 
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8" // 👈 避開 CORS 錯誤的關鍵
+                    },
+                    body: JSON.stringify({ action: "getOils" })
+                });
 
-        // 3. 抽油與寫入客資 (修改裡面的 fetch)
-        await fetch(GAS_API_URL, {
-            method: 'POST',
-            redirect: 'follow',
-            headers: {
-                "Content-Type": "text/plain;charset=utf-8" // 👈 一樣加上這行
-            },
-            body: JSON.stringify({ 
-                action: "saveRecord", 
-                userName: customerName, 
-                drawnOil: selected.name 
-            })
-        });
+                const result = await response.json();
 
-        // 網頁一載入就啟動 LIFF
+                if (result.status === "success") {
+                    oils = result.data;
+                    drawBtn.innerText = "輕觸牌卡，開始盲抽";
+                    drawBtn.disabled = false;
+                } else {
+                    throw new Error(result.message);
+                }
+            } catch (error) {
+                console.error("資料連線失敗:", error);
+                drawBtn.innerText = "資料連線失敗";
+            }
+        }
+
+        // 3. 抽油與寫入客資
+        async function drawOil() {
+            if (oils.length === 0) return;
+
+            // 隨機抽出一支精油
+            const randomIndex = Math.floor(Math.random() * oils.length);
+            const selected = oils[randomIndex];
+
+            // 更新畫面
+            document.getElementById('inputArea').classList.add('hidden');
+            const card = document.getElementById('resultCard');
+            
+            card.style.animation = 'none';
+            card.offsetHeight; 
+            card.style.animation = 'fadeIn 0.8s ease forwards';
+
+            document.getElementById('oilName').innerText = selected.name;
+            document.getElementById('oilQuote').innerText = selected.quote;
+            document.getElementById('oilEnergy').innerText = selected.energy;
+            document.getElementById('oilAction').innerText = selected.action;
+            document.getElementById('oilAffirmation').innerText = selected.affirmation;
+            card.style.display = 'block';
+
+            // 背景自動寫入 Notion 療癒個案紀錄
+            try {
+                await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    redirect: 'follow',
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8" // 👈 寫入存檔一樣要避開 CORS
+                    },
+                    body: JSON.stringify({ 
+                        action: "saveRecord", 
+                        userName: customerName, 
+                        drawnOil: selected.name 
+                    })
+                });
+                console.log("紀錄已存入 Notion");
+            } catch (error) {
+                console.error("存檔失敗:", error);
+            }
+        }
+
+        // 網頁一載入就啟動
         initLiff();
     </script>
 </body>
