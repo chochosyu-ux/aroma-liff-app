@@ -6,7 +6,6 @@
     <title>涵香療癒所 🌿 專屬精油盲抽</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        /* 你的 CSS 寫得很溫暖好看，完全保留！ */
         body { font-family: "Microsoft JhengHei", sans-serif; background: linear-gradient(135deg, #FDFBF7 0%, #F3E8E0 100%); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; color: #5C4A3D; }
         .container { text-align: center; background: rgba(255, 255, 255, 0.75); padding: 40px 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(188, 138, 95, 0.1); backdrop-filter: blur(10px); max-width: 420px; width: 85%; }
         h1 { font-size: 24px; color: #8C6D53; margin-bottom: 5px; }
@@ -21,7 +20,6 @@
         .content-text { font-size: 15px; line-height: 1.6; color: #6D5B4F; margin-bottom: 10px; }
         .affirmation-box { background: #F3E8E0; padding: 15px; border-radius: 10px; text-align: center; font-size: 15px; color: #5C4A3D; font-weight: bold; margin-top: 20px; }
         .hidden { display: none !important; }
-        .error-msg { color: #D4A373; font-weight: bold; font-size: 18px; margin-top: 20px;}
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
@@ -29,12 +27,6 @@
 
     <div class="container">
         <h1>涵香療癒所 🌿</h1>
-        
-        <div id="blockArea" class="hidden">
-            <p class="error-msg">請透過官方 LINE 進入盲抽系統喔！</p>
-            <p style="font-size:14px; color:#9E897A;">這樣我們才能為您準備專屬的療癒指引。</p>
-        </div>
-
         <div id="mainArea">
             <p class="subtitle" id="greetingText">宇宙頻率連線中...</p>
             <div id="inputArea">
@@ -58,33 +50,43 @@
     </div>
 
     <script>
-        // 你的最新 GAS 網址 (已帶入)
-        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwwPZYPgWmD1-xRoVP8FE06kjzOuiyFNYC3JEpZZPOz1aOJGo31jl-cTxMirHXYmT4igw/exec";
+        // 🚨 唯一需要你修改的地方：把這串換成你剛剛在 GAS 拿到的新網址！
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwgAkHCVlTzQ3RrTz6mNec6yOttavmVFE3p9G1eMBu1r2fmg-bEd9iuZw4PlE7xMafesw/exec";
 
         let oils = [];
         let customerName = "匿名盲抽";
         const drawBtn = document.getElementById('drawBtn');
         const greetingText = document.getElementById('greetingText');
 
-        // 1. 初始化 (作弊測試版 - 電腦可開)
+        // 1. 初始化 LIFF
         async function initLiff() {
-            console.log("進入作弊模式：跳過 LINE 驗證");
-            customerName = "開發測試員"; 
-            greetingText.innerText = `親愛的 ${customerName}，抽取今日的專屬療癒指引吧`;
-            
-            // 呼叫後端拿精油資料
-            fetchNotionOils();
+            try {
+                await liff.init({ liffId: "2009442731-uAtwWSRT" });
+                
+                if (!liff.isLoggedIn()) {
+                    liff.login(); // 如果沒登入，引導登入 (支援電腦版測試)
+                    return;
+                }
+
+                const profile = await liff.getProfile();
+                customerName = profile.displayName;
+                greetingText.innerText = `親愛的 ${customerName}，抽取今日的專屬療癒指引吧`;
+                
+                fetchNotionOils();
+
+            } catch (err) {
+                console.error("LIFF 錯誤", err);
+                greetingText.innerText = "連線異常，請稍後再試";
+            }
         }
 
-        // 2. 呼叫 GAS 後端取得精油
+        // 2. 抓取精油資料
         async function fetchNotionOils() {
             try {
                 const response = await fetch(GAS_API_URL, {
                     method: 'POST',
                     redirect: 'follow', 
-                    headers: {
-                        "Content-Type": "text/plain;charset=utf-8" // 👈 避開 CORS 錯誤的關鍵
-                    },
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
                     body: JSON.stringify({ action: "getOils" })
                 });
 
@@ -103,15 +105,13 @@
             }
         }
 
-        // 3. 抽油與寫入客資
+        // 3. 抽籤與存檔
         async function drawOil() {
             if (oils.length === 0) return;
 
-            // 隨機抽出一支精油
             const randomIndex = Math.floor(Math.random() * oils.length);
             const selected = oils[randomIndex];
 
-            // 更新畫面
             document.getElementById('inputArea').classList.add('hidden');
             const card = document.getElementById('resultCard');
             
@@ -126,27 +126,22 @@
             document.getElementById('oilAffirmation').innerText = selected.affirmation;
             card.style.display = 'block';
 
-            // 背景自動寫入 Notion 療癒個案紀錄
             try {
                 await fetch(GAS_API_URL, {
                     method: 'POST',
                     redirect: 'follow',
-                    headers: {
-                        "Content-Type": "text/plain;charset=utf-8" // 👈 寫入存檔一樣要避開 CORS
-                    },
+                    headers: { "Content-Type": "text/plain;charset=utf-8" },
                     body: JSON.stringify({ 
                         action: "saveRecord", 
                         userName: customerName, 
                         drawnOil: selected.name 
                     })
                 });
-                console.log("紀錄已存入 Notion");
             } catch (error) {
                 console.error("存檔失敗:", error);
             }
         }
 
-        // 網頁一載入就啟動
         initLiff();
     </script>
 </body>
