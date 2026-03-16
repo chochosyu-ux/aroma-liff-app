@@ -66,29 +66,37 @@
         const drawBtn = document.getElementById('drawBtn');
         const greetingText = document.getElementById('greetingText');
 
-        // 1. 初始化 LINE LIFF
-        async function initLiff() {
-            try {
-                await liff.init({ liffId: "2009442731-uAtwWSRT" });
-                
-                if (!liff.isInClient()) {
-                    document.getElementById('mainArea').classList.add('hidden');
-                    document.getElementById('blockArea').classList.remove('hidden');
-                    return; 
-                }
-
-                const profile = await liff.getProfile();
-                customerName = profile.displayName;
-                greetingText.innerText = `親愛的 ${customerName}，抽取今日的專屬療癒指引吧`;
-                
-                // 開始呼叫後端拿精油資料
-                fetchNotionOils();
-
-            } catch (err) {
-                console.error("LIFF 初始化失敗", err);
-                greetingText.innerText = "系統連線異常，請稍後再試";
-            }
+        // 1. 初始化 LINE LIFF (電腦開發除錯版)
+async function initLiff() {
+    try {
+        await liff.init({ liffId: "2009442731-uAtwWSRT" });
+        
+        // ⚠️【作弊模式】把 isInClient 的阻擋機制註解掉了！
+        /* if (!liff.isInClient()) {
+            document.getElementById('mainArea').classList.add('hidden');
+            document.getElementById('blockArea').classList.remove('hidden');
+            return; 
         }
+        */
+
+        // 👉 改成檢查：如果還沒登入，就引導去登入
+        if (!liff.isLoggedIn()) {
+            liff.login(); // 電腦版會跳轉到 LINE 登入畫面
+            return; // 等待登入完畢回來
+        }
+
+        const profile = await liff.getProfile();
+        customerName = profile.displayName;
+        greetingText.innerText = `親愛的 ${customerName}，抽取今日的專屬療癒指引吧`;
+        
+        // 開始呼叫後端拿精油資料
+        fetchNotionOils();
+
+    } catch (err) {
+        console.error("LIFF 初始化失敗", err);
+        greetingText.innerText = "系統連線異常，請稍後再試";
+    }
+}
 
         // 2. 呼叫 GAS 後端取得精油 (改用 fetch)
         async function fetchNotionOils() {
